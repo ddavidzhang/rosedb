@@ -4,9 +4,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/flower-corp/rosedb"
-	"github.com/flower-corp/rosedb/logger"
-	"github.com/tidwall/redcon"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -14,6 +11,10 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/flower-corp/rosedb"
+	"github.com/flower-corp/rosedb/logger"
+	"github.com/tidwall/redcon"
 )
 
 var (
@@ -43,7 +44,7 @@ type Server struct {
 	ser    *redcon.Server
 	signal chan os.Signal
 	opts   ServerOptions
-	mu     *sync.RWMutex
+	mu     *sync.RWMutex // lock for dbs
 }
 
 type ServerOptions struct {
@@ -84,6 +85,7 @@ func main() {
 	addr := svr.opts.host + ":" + svr.opts.port
 	redServer := redcon.NewServerNetwork("tcp", addr, execClientCommand, svr.redconAccept,
 		func(conn redcon.Conn, err error) {
+			logger.Infof("conn closed, remote addr:%s err:%+v", conn.RemoteAddr(), err)
 		},
 	)
 	svr.ser = redServer
@@ -115,7 +117,7 @@ func (svr *Server) stop() {
 func (svr *Server) redconAccept(conn redcon.Conn) bool {
 	cli := new(Client)
 	cli.svr = svr
-	svr.mu.RLock()
+	svr.mu.RLock() // david: where is the WLock?
 	cli.db = svr.dbs[0]
 	svr.mu.RUnlock()
 	conn.SetContext(cli)

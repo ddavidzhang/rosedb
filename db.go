@@ -3,14 +3,7 @@ package rosedb
 import (
 	"encoding/binary"
 	"errors"
-	"github.com/flower-corp/rosedb/ds/art"
-	"github.com/flower-corp/rosedb/ds/zset"
-	"github.com/flower-corp/rosedb/flock"
-	"github.com/flower-corp/rosedb/logfile"
-	"github.com/flower-corp/rosedb/logger"
-	"github.com/flower-corp/rosedb/util"
 	"io"
-	"io/ioutil"
 	"math"
 	"os"
 	"os/signal"
@@ -22,6 +15,13 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/flower-corp/rosedb/ds/art"
+	"github.com/flower-corp/rosedb/ds/zset"
+	"github.com/flower-corp/rosedb/flock"
+	"github.com/flower-corp/rosedb/logfile"
+	"github.com/flower-corp/rosedb/logger"
+	"github.com/flower-corp/rosedb/util"
 )
 
 var (
@@ -61,7 +61,7 @@ type (
 		activeLogFiles   map[DataType]*logfile.LogFile
 		archivedLogFiles map[DataType]archivedFiles
 		fidMap           map[DataType][]uint32 // only used at startup, never update even though log files changed.
-		discards         map[DataType]*discard
+		discards         map[DataType]*discard // david: what is discards, what for?
 		opts             Options
 		strIndex         *strIndex  // String indexes(adaptive-radix-tree).
 		listIndex        *listIndex // List indexes.
@@ -299,7 +299,7 @@ func (db *RoseDB) getArchivedLogFile(dataType DataType, fid uint32) *logfile.Log
 
 // write entry to log file.
 func (db *RoseDB) writeLogEntry(ent *logfile.LogEntry, dataType DataType) (*valuePos, error) {
-	if err := db.initLogFile(dataType); err != nil {
+	if err := db.initLogFile(dataType); err != nil { // david: init 和 getActiveLogFile 可考虑合并，简化锁的使用次数
 		return nil, err
 	}
 	activeLogFile := db.getActiveLogFile(dataType)
@@ -310,7 +310,7 @@ func (db *RoseDB) writeLogEntry(ent *logfile.LogEntry, dataType DataType) (*valu
 	opts := db.opts
 	entBuf, esize := logfile.EncodeEntry(ent)
 	if activeLogFile.WriteAt+int64(esize) > opts.LogFileSizeThreshold {
-		if err := activeLogFile.Sync(); err != nil {
+		if err := activeLogFile.Sync(); err != nil { // david: => flush to disk
 			return nil, err
 		}
 
@@ -326,7 +326,7 @@ func (db *RoseDB) writeLogEntry(ent *logfile.LogEntry, dataType DataType) (*valu
 		ftype, iotype := logfile.FileType(dataType), logfile.IOType(opts.IoType)
 		lf, err := logfile.OpenLogFile(opts.DBPath, activeFileId+1, opts.LogFileSizeThreshold, ftype, iotype)
 		if err != nil {
-			db.mu.Unlock()
+			db.mu.Unlock() // david: lock时 立即 defer 会更好
 			return nil, err
 		}
 		db.discards[dataType].setTotal(lf.Fid, uint32(opts.LogFileSizeThreshold))
@@ -351,7 +351,7 @@ func (db *RoseDB) writeLogEntry(ent *logfile.LogEntry, dataType DataType) (*valu
 func (db *RoseDB) loadLogFiles() error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
-	fileInfos, err := ioutil.ReadDir(db.opts.DBPath)
+	fileInfos, err := os.ReadDir(db.opts.DBPath)
 	if err != nil {
 		return err
 	}
@@ -359,7 +359,7 @@ func (db *RoseDB) loadLogFiles() error {
 	fidMap := make(map[DataType][]uint32)
 	for _, file := range fileInfos {
 		if strings.HasPrefix(file.Name(), logfile.FilePrefix) {
-			splitNames := strings.Split(file.Name(), ".")
+			splitNames := strings.Split(file.Name(), ".") // file name format: log.{type}.{fid}
 			fid, err := strconv.Atoi(splitNames[2])
 			if err != nil {
 				return err
@@ -384,8 +384,8 @@ func (db *RoseDB) loadLogFiles() error {
 
 		opts := db.opts
 		for i, fid := range fids {
-			ftype, iotype := logfile.FileType(dataType), logfile.IOType(opts.IoType)
-			lf, err := logfile.OpenLogFile(opts.DBPath, fid, opts.LogFileSizeThreshold, ftype, iotype)
+			fileType, ioType := logfile.FileType(dataType), logfile.IOType(opts.IoType)
+			lf, err := logfile.OpenLogFile(opts.DBPath, fid, opts.LogFileSizeThreshold, fileType, ioType)
 			if err != nil {
 				return err
 			}

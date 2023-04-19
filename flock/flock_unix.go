@@ -1,3 +1,4 @@
+//go:build !windows && !plan9
 // +build !windows,!plan9
 
 package flock
@@ -33,7 +34,7 @@ func AcquireFileLock(path string, readOnly bool) (*FileLockGuard, error) {
 	if readOnly {
 		how = syscall.LOCK_SH | syscall.LOCK_NB
 	}
-	if err := syscall.Flock(int(file.Fd()), how); err != nil {
+	if err := syscall.Flock(int(file.Fd()), how); err != nil { // david: what is flock?
 		return nil, err
 	}
 	return &FileLockGuard{fd: file}, nil

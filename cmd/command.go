@@ -3,13 +3,14 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/flower-corp/rosedb"
-	"github.com/flower-corp/rosedb/util"
-	"github.com/tidwall/redcon"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/flower-corp/rosedb"
+	"github.com/flower-corp/rosedb/util"
+	"github.com/tidwall/redcon"
 )
 
 const (

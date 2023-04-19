@@ -1,9 +1,10 @@
 package ioselector
 
 import (
-	"github.com/flower-corp/rosedb/mmap"
 	"io"
 	"os"
+
+	"github.com/flower-corp/rosedb/mmap"
 )
 
 // MMapSelector represents using memory-mapped file I/O.

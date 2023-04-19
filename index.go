@@ -1,15 +1,16 @@
 package rosedb
 
 import (
-	"github.com/flower-corp/rosedb/ds/art"
-	"github.com/flower-corp/rosedb/logfile"
-	"github.com/flower-corp/rosedb/logger"
-	"github.com/flower-corp/rosedb/util"
 	"io"
 	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/flower-corp/rosedb/ds/art"
+	"github.com/flower-corp/rosedb/logfile"
+	"github.com/flower-corp/rosedb/logger"
+	"github.com/flower-corp/rosedb/util"
 )
 
 // DataType Define the data structure type.
@@ -192,7 +193,7 @@ func (db *RoseDB) loadIndexFromLogFiles() error {
 
 			var offset int64
 			for {
-				entry, esize, err := logFile.ReadLogEntry(offset)
+				entry, entrySize, err := logFile.ReadLogEntry(offset)
 				if err != nil {
 					if err == io.EOF || err == logfile.ErrEndOfEntry {
 						break
@@ -201,7 +202,7 @@ func (db *RoseDB) loadIndexFromLogFiles() error {
 				}
 				pos := &valuePos{fid: fid, offset: offset}
 				db.buildIndex(dataType, entry, pos)
-				offset += esize
+				offset += entrySize
 			}
 			// set latest log file`s WriteAt.
 			if i == len(fids)-1 {

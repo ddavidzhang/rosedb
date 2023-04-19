@@ -85,9 +85,9 @@ type LogFile struct {
 }
 
 // OpenLogFile open an existing or create a new log file.
-// fsize must be a postitive number.And we will create io selector according to ioType.
-func OpenLogFile(path string, fid uint32, fsize int64, ftype FileType, ioType IOType) (lf *LogFile, err error) {
-	lf = &LogFile{Fid: fid}
+// fsize must be a positive number.And we will create io selector according to ioType.
+func OpenLogFile(path string, fid uint32, fsize int64, ftype FileType, ioType IOType) (*LogFile, error) {
+	lf := &LogFile{Fid: fid}
 	fileName, err := lf.getLogFileName(path, fid, ftype)
 	if err != nil {
 		return nil, err
@@ -97,18 +97,18 @@ func OpenLogFile(path string, fid uint32, fsize int64, ftype FileType, ioType IO
 	switch ioType {
 	case FileIO:
 		if selector, err = ioselector.NewFileIOSelector(fileName, fsize); err != nil {
-			return
+			return nil, err
 		}
 	case MMap:
 		if selector, err = ioselector.NewMMapSelector(fileName, fsize); err != nil {
-			return
+			return nil, err
 		}
 	default:
 		return nil, ErrUnsupportedIoType
 	}
 
 	lf.IoSelector = selector
-	return
+	return lf, nil
 }
 
 // ReadLogEntry read a LogEntry from log file at offset.
@@ -204,12 +204,12 @@ func (lf *LogFile) readBytes(offset, n int64) (buf []byte, err error) {
 	return
 }
 
-func (lf *LogFile) getLogFileName(path string, fid uint32, ftype FileType) (name string, err error) {
+// getLogFileName file path format: path/log.strs.000000001
+func (lf *LogFile) getLogFileName(path string, fid uint32, ftype FileType) (string, error) {
 	if _, ok := FileNamesMap[ftype]; !ok {
 		return "", ErrUnsupportedLogFileType
 	}
 
 	fname := FileNamesMap[ftype] + fmt.Sprintf("%09d", fid)
-	name = filepath.Join(path, fname)
-	return
+	return filepath.Join(path, fname), nil
 }
